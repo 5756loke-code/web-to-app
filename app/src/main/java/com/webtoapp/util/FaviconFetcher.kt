@@ -232,12 +232,18 @@ object FaviconFetcher {
     }
     
     /**
-     * 获取基础 URL（协议 + 域名）
+     * 获取基础 URL（协议 + 域名 + 端口）
      */
     private fun getBaseUrl(url: String): String {
         return try {
             val uri = URI(url)
-            "${uri.scheme}://${uri.host}"
+            val port = uri.port
+            val host = uri.host ?: return url
+            if (port != -1 && port != 80 && port != 443) {
+                "${uri.scheme}://$host:$port"
+            } else {
+                "${uri.scheme}://$host"
+            }
         } catch (e: Exception) {
             url.substringBefore("/", url).let {
                 if (it.contains("://")) it.substringBefore("/", it)
@@ -257,5 +263,26 @@ object FaviconFetcher {
             else -> "$baseUrl/$href"
         }
         return upgradeRemoteHttpToHttps(resolved)
+    }
+
+    /**
+     * 将远程 HTTP URL 升级为 HTTPS（本地地址保持 HTTP）
+     */
+    private fun upgradeRemoteHttpToHttps(url: String): String {
+        if (!url.startsWith("http://")) return url
+        return try {
+            val uri = URI(url)
+            val host = uri.host ?: return url
+            // 本地地址不升级
+            if (host == "localhost" || host == "127.0.0.1" || host == "0.0.0.0"
+                || host.startsWith("192.168.") || host.startsWith("10.")
+                || host.endsWith(".local")) {
+                url
+            } else {
+                url.replaceFirst("http://", "https://")
+            }
+        } catch (e: Exception) {
+            url
+        }
     }
 }
